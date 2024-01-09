@@ -1,12 +1,27 @@
+
 import express from 'express'
 
+// import upload from './upload';
 import bodyParser from 'body-parser'
 import fs from 'fs'
 import multer from "multer"
 import cors from 'cors'
+import {v2 as cloudinary} from "cloudinary"
+import dotenv from 'dotenv'
 
+dotenv.config()
+
+
+cloudinary.config({
+  cloud_name: process.env.CLOUD_NAME,
+  api_key: process.env.API_KEY,
+  api_secret: process.env.API_SECRET,
+});
 
 const app = express();
+
+
+app.use('/static',express.static('uploads'))
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
@@ -48,14 +63,16 @@ const mergeChunks = async (fileName, totalChunks) => {
   console.log("Chunks merged successfully");
 };
 
-app.post("/upload", upload.single("file"), async (req, res) => {
-  console.log("Hit");
+
+
+app.post('/upload', upload.single('file'), async (req, res) => {
+  console.log('Hit');
   const chunk = req.file.buffer;
   const chunkNumber = Number(req.body.chunkNumber); // Sent from the client
   const totalChunks = Number(req.body.totalChunks); // Sent from the client
   const fileName = req.body.originalname;
 
-  const chunkDir = __dirname + "/chunks"; // Directory to save chunks
+  const chunkDir = __dirname + '/chunks'; // Directory to save chunks
 
   if (!fs.existsSync(chunkDir)) {
     fs.mkdirSync(chunkDir);
@@ -69,15 +86,28 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     if (chunkNumber === totalChunks - 1) {
       // If this is the last chunk, merge all chunks into a single file
       await mergeChunks(fileName, totalChunks);
-      console.log("File merged successfully");
+
+      // Upload the merged file to Cloudinary
+     console.log(  fs.existsSync(`${__dirname}/merged_files/${fileName}`),'file')
+      // const cloudinaryUploadResult = await cloudinary.uploader.upload(`${__dirname}/merged_files/${fileName}`, {
+      //   folder: 'cloudinary_uploads', // optional folder in Cloudinary
+      // });
+      // console.log('File uploaded to Cloudinary:', cloudinaryUploadResult);
+
+      // Optionally, you can delete the merged file from the server after uploading to Cloudinary
+      // fs.unlinkSync(`${__dirname}/merged_files/${fileName}`);
+
+      console.log('File merged and uploaded to Cloudinary successfully');
     }
 
-    res.status(200).json({ message: "Chunk uploaded successfully" });
+    res.status(200).json({ message: 'Chunk uploaded successfully' });
   } catch (error) {
-    console.error("Error saving chunk:", error);
-    res.status(500).json({ error: "Error saving chunk" });
+    console.error('Error saving chunk:', error);
+    res.status(500).json({ error: 'Error saving chunk' });
   }
 });
+
+
 
 app.listen(PORT, () => {
   console.log(`Port listening on ${PORT}`);
